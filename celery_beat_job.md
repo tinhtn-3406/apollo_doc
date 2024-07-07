@@ -2,15 +2,15 @@
 
 ## Setting `celery_beat`
 
-#####  Create a new file named `celery_beat.py` in the `src/worker` folder
+##### Create a new file named `celery_beat.py` in the `src/worker` folder
 
   ```python
   from pydantic import BaseSettings
   from celery import Celery
 
-    class CelerySettings(BaseSettings):
-        celery_broker_uri: str
-        celery_backend_uri: str
+  class CelerySettings(BaseSettings):
+      celery_broker_uri: str
+      celery_backend_uri: str
 
     settings = CelerySettings()
 
@@ -20,12 +20,12 @@
         backend=settings.celery_backend_uri,
     )
 
-    client.conf.timezone = 'UTC'
+    client.conf.timezone = 'Asia/Tokyo'
     client.conf.beat_schedule = {
         # Setting up a cron job
         'task-schedule-name': { 
             # This will call the worker.cron_tasks.push_encourage_user_open_app_cron function in src/worker/cron_tasks.py
-            'task': 'worker.tasks.worker.cron_tasks.push_encourage_user_open_app', 
+            'task': 'worker.cron_tasks.push_encourage_user_open_app_cron', 
             # Run every hour (3600 seconds)
             'schedule': 3600.0,  
         },
@@ -35,11 +35,39 @@
 - This setup will configure a Celery beat scheduler to run a task every hour by calling the `push_encourage_user_open_app_cron` function in the `src/worker/cron_tasks.py` file.
 - `schedule`: Configuration-based [documentation on periodic tasks](https://docs.celeryq.dev/en/stable/userguide/periodic-tasks.html)
 
+##### Update import `worker.cron_tasks` in `celery_worker.py`
+
+- In file named `celery_worker.py` add  `worker.cron_tasks` in `client.conf.imports`
+
+ ```python
+  from pydantic.env_settings import BaseSettings
+  from celery import Celery
+
+
+  class CelerySettings(BaseSettings):
+      celery_broker_uri: str
+      celery_backend_uri: str
+
+
+  settings = CelerySettings()
+
+  client = Celery(__name__)
+  client.conf.broker_url = settings.celery_broker_uri
+  client.conf.result_backend = settings.celery_backend_uri
+  client.conf.imports = [
+      'worker.tasks',
+      # Update here
+      'worker.cron_tasks'
+  ]
+```
+
+![Alt text](./images/celery_beat_job/update_import_celery_worker.png)
+
 ##### Modify the docker-compose-worker.yml configuration
 
   ```docker
 
-    celery-beat: &celery_worker
+    celery_beat: &celery_worker
       build: .
       image: celery_worker_dev
       volumes:
@@ -57,7 +85,6 @@
 ```
 
 ![Alt text](./images/celery_beat_job/docker-compose-worker.png)
-
 
 ## Setting celery task
 
