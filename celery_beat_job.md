@@ -24,10 +24,14 @@
     client.conf.beat_schedule = {
         # Setting up a cron job
         'task-schedule-name': { 
-            # This will call the worker.cron_tasks.push_encourage_user_open_app_cron function in src/worker/cron_tasks.py
-            'task': 'worker.cron_tasks.push_encourage_user_open_app_cron', 
-            # Run every hour (3600 seconds)
-            'schedule': 3600.0,  
+          # This will call the worker.cron_tasks.push_encourage_user_open_app_cron function in src/worker/cron_tasks.py
+          'task': 'worker.cron_tasks.push_encourage_user_open_app_cron', 
+          # Run every hour (3600 seconds)
+          'schedule': 3600.0,
+        },
+        'task-schedule-monday': {
+          'task': 'worker.cron_tasks.create_ex_push',
+          'schedule': crontab(hour=19, minute=00, day_of_week=1),
         },
     }
   ```
@@ -100,4 +104,19 @@
       # Your task implementation here
       push_encourage_user_open_app.main()
 
+  ```
+
+  ```py
+  from worker.celery_worker import client
+  import subprocess
+
+
+  @client.task
+  def create_ex_push():
+      command = '''
+          export PYTHONPATH=. && \
+          python tools/push_noti/create_push_by_push_type.py --push_time "12:30:00" --type "AFTERNOON_TIME"
+      '''
+
+      subprocess.run(command, shell=True, check=True, executable='/bin/bash')
   ```
