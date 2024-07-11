@@ -7,33 +7,36 @@
   ```python
   from pydantic import BaseSettings
   from celery import Celery
-
+  from celery.schedules import crontab
+  
+  
   class CelerySettings(BaseSettings):
       celery_broker_uri: str
       celery_backend_uri: str
-
-    settings = CelerySettings()
-
-    client = Celery(
-        'app',
-        broker=settings.celery_broker_uri,
-        backend=settings.celery_backend_uri,
-    )
-
-    client.conf.timezone = 'Asia/Tokyo'
-    client.conf.beat_schedule = {
-        # Setting up a cron job
-        'task-schedule-name': { 
+  
+  
+  settings = CelerySettings()
+  
+  client = Celery(
+      'app',
+      broker=settings.celery_broker_uri,
+      backend=settings.celery_backend_uri,
+  )
+  
+  client.conf.timezone = 'Asia/Tokyo'
+  client.conf.beat_schedule = {
+      # Setting up a cron job
+      'task-schedule-name': {
           # This will call the worker.cron_tasks.push_encourage_user_open_app_cron function in src/worker/cron_tasks.py
-          'task': 'worker.cron_tasks.push_encourage_user_open_app_cron', 
+          'task': 'worker.cron_tasks.push_encourage_user_open_app_cron',
           # Run every hour (3600 seconds)
           'schedule': 3600.0,
-        },
-        'task-schedule-monday': {
+      },
+      'task-schedule-monday': {
           'task': 'worker.cron_tasks.create_ex_push',
-          'schedule': crontab(hour=19, minute=00, day_of_week=1),
-        },
-    }
+          'schedule': crontab(hour=22, minute=00),
+      },
+  }
   ```
 
 - This setup will configure a Celery beat scheduler to run a task every hour by calling the `push_encourage_user_open_app_cron` function in the `src/worker/cron_tasks.py` file.
@@ -107,16 +110,24 @@
   ```
 
   ```py
+  from tools.push_noti import push_encourage_user_open_app
   from worker.celery_worker import client
   import subprocess
-
-
+  
+  
+  @client.task
+  def push_encourage_user_open_app_cron():
+      # Your task implementation here
+      push_encourage_user_open_app.main()
+  
+  
+  
   @client.task
   def create_ex_push():
       command = '''
           export PYTHONPATH=. && \
           python tools/push_noti/create_push_by_push_type.py --push_time "12:30:00" --type "AFTERNOON_TIME"
       '''
-
+  
       subprocess.run(command, shell=True, check=True, executable='/bin/bash')
   ```
